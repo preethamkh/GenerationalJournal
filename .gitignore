@@ -1,0 +1,32 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.vs/
+
+# Data (your databases and media)
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Environment
+.env
+*.env.local
+
+# Build logs
+BUILD_LOG.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Kilo Code
+.kilo/

@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="GenerationalJournal.Api/GenerationalJournal.Api.csproj" />
+  <Project Path="GenerationalJournal.Application/GenerationalJournal.Application.csproj" />
+  <Project Path="GenerationalJournal.Domain/GenerationalJournal.Domain.csproj" />
+  <Project Path="GenerationalJournal.Infrastructure/GenerationalJournal.Infrastructure.csproj" />
+</Solution>
