@@ -1,6 +1,11 @@
 using System.Text;
+using GenerationalJournal.Api.Endpoints;
 using GenerationalJournal.Api.Middleware;
+using GenerationalJournal.Application.Configuration;
+using GenerationalJournal.Application.Services;
+using GenerationalJournal.Domain.Repositories;
 using GenerationalJournal.Infrastructure.Data;
+using GenerationalJournal.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -72,6 +77,11 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddHealthChecks();
 
+builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
+
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+
 var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionHandler>();
@@ -95,6 +105,8 @@ app.MapHealthChecks("/health");
 
 app.MapGet("/", () => Results.Ok(new { name = "Generational Journal API", version = "1.0", status = "running" }))
     .AllowAnonymous();
+
+app.MapAuthEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {
