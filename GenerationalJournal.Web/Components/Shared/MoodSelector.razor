@@ -1,0 +1,41 @@
+<div class="mood-selector d-flex flex-wrap gap-2" role="group" aria-label="Mood">
+    @foreach (var mood in Moods)
+    {
+        var selected = string.Equals(Mood, mood.Value, StringComparison.OrdinalIgnoreCase);
+        <button type="button"
+                class="btn mood-option @(selected ? "btn-primary" : "btn-outline-primary")"
+                aria-pressed="@selected"
+                @onclick="() => SelectMood(mood)">
+            <span class="mood-dot" style="background-color: @mood.Color;"></span>
+            @mood.Value
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Mood { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> MoodChanged { get; set; }
+
+    private static readonly IReadOnlyList<MoodOption> Moods = new List<MoodOption>
+    {
+        new("Happy", "#198754"),
+        new("Grateful", "#6f42c1"),
+        new("Excited", "#fd7e14"),
+        new("Peaceful", "#0d6efd"),
+        new("Nostalgic", "#6c757d"),
+        new("Proud", "#ffc107"),
+        new("Anxious", "#dc3545"),
+        new("Sad", "#0dcaf0"),
+    };
+
+    private async Task SelectMood(MoodOption mood)
+    {
+        Mood = mood.Value;
+        await MoodChanged.InvokeAsync(Mood);
+    }
+
+    private sealed record MoodOption(string Value, string Color);
+}

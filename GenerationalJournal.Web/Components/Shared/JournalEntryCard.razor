@@ -1,0 +1,62 @@
+@using System.Security.Claims
+@using GenerationalJournal.Web.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+
+<article class="card journal-entry-card shadow-sm mb-3">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+            <h5 class="card-title mb-1">@Entry.Title</h5>
+            @if (!string.IsNullOrWhiteSpace(Entry.Mood))
+            {
+                <span class="badge rounded-pill text-bg-primary">@Entry.Mood</span>
+            }
+        </div>
+
+        <p class="text-muted small mb-2">
+            By <span class="fw-semibold">@Entry.AuthorName</span>
+            &middot; @Entry.EntryDate.ToString("MMMM d, yyyy")
+            @if (Entry.IsPrivate)
+            {
+                <span class="badge text-bg-secondary ms-1">Private</span>
+            }
+        </p>
+
+        @if (Entry.TagList.Count > 0)
+        {
+            <div class="mb-2">
+                @foreach (var tag in Entry.TagList)
+                {
+                    <span class="badge text-bg-light border me-1">@tag</span>
+                }
+            </div>
+        }
+
+        <p class="card-text journal-content">@Entry.Content</p>
+
+        @if (CanEdit)
+        {
+            <div class="d-flex gap-2 mt-2">
+                <a class="btn btn-outline-primary btn-sm" href="@($"/entries/{Entry.Id}/edit")">Edit</a>
+                <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => OnDelete.InvokeAsync(Entry)">Delete</button>
+            </div>
+        }
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public JournalEntryResponse Entry { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<JournalEntryResponse> OnDelete { get; set; }
+
+    private bool CanEdit { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        CanEdit = userId is not null && Guid.TryParse(userId, out var id) && id == Entry.AuthorId;
+    }
+}

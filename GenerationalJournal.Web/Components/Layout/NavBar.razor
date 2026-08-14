@@ -1,0 +1,48 @@
+@inject AuthStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<nav class="navbar navbar-expand-md navbar-dark bg-primary shadow-sm fixed-top">
+    <div class="container">
+        <a class="navbar-brand fw-semibold" href="/">Generational Journal</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNav">
+            <ul class="navbar-nav ms-auto align-items-md-center gap-md-2">
+                <AuthorizeView>
+                    <Authorized>
+                        <li class="nav-item">
+                            <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">Dashboard</NavLink>
+                        </li>
+                        <li class="nav-item">
+                            <span class="nav-link text-white-50">
+                                <span class="d-md-none">Signed in as </span>
+                                <span class="fw-semibold text-white">@context.User.Identity?.Name</span>
+                            </span>
+                        </li>
+                        <li class="nav-item">
+                            <button type="button" class="btn btn-outline-light btn-sm" @onclick="HandleLogout">Log out</button>
+                        </li>
+                    </Authorized>
+                    <NotAuthorized>
+                        <li class="nav-item">
+                            <NavLink class="nav-link" href="login">Log in</NavLink>
+                        </li>
+                        <li class="nav-item">
+                            <NavLink class="nav-link" href="register">Register</NavLink>
+                        </li>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+@code {
+    private async Task HandleLogout()
+    {
+        await AuthStateProvider.LogoutAsync();
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+}

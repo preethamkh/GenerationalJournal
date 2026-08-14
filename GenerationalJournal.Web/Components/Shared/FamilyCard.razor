@@ -1,0 +1,24 @@
+@using GenerationalJournal.Web.Models
+
+<div class="col">
+    <div class="card h-100 family-card shadow-sm">
+        <div class="card-body d-flex flex-column">
+            <h5 class="card-title mb-2">@Family.Name</h5>
+            <p class="card-text text-muted flex-grow-1 family-description">
+                @(string.IsNullOrWhiteSpace(Family.Description) ? "No description provided." : Family.Description)
+            </p>
+            <p class="card-text">
+                <small class="text-muted">Created @Family.CreatedAt.ToString("MMM d, yyyy")</small>
+            </p>
+            <div class="d-flex gap-2">
+                <a class="btn btn-primary btn-sm" href="@($"/families/{Family.Id}")">Open</a>
+                <a class="btn btn-outline-secondary btn-sm" href="@($"/families/{Family.Id}/timeline")">Timeline</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public FamilyResponse Family { get; set; } = new();
+}
