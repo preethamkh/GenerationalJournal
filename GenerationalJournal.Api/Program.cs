@@ -81,6 +81,8 @@ builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"))
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IFamilyRepository, FamilyRepository>();
+builder.Services.AddScoped<IFamilyService, FamilyService>();
 
 var app = builder.Build();
 
@@ -107,6 +109,7 @@ app.MapGet("/", () => Results.Ok(new { name = "Generational Journal API", versio
     .AllowAnonymous();
 
 app.MapAuthEndpoints();
+app.MapFamilyEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {
