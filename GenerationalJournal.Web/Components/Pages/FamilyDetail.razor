@@ -1,0 +1,218 @@
+@page "/families/{FamilyId:guid}"
+@attribute [Authorize]
+@using System.Net
+@using System.Security.Claims
+@inject ApiClient Api
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+
+<PageTitle>@(Family?.Name ?? "Family")</PageTitle>
+
+@if (Loading)
+{
+    <div class="text-center text-muted py-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (NotFound)
+{
+    <div class="alert alert-warning" role="alert">This family could not be found or you don't have access to it.</div>
+}
+else if (Family is not null)
+{
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">@Family.Name</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+            <h1>@Family.Name</h1>
+            @if (!string.IsNullOrWhiteSpace(Family.Description))
+            {
+                <p class="text-muted mb-0">@Family.Description</p>
+            }
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="@($"/families/{FamilyId}/timeline")">Timeline</a>
+            <a class="btn btn-primary" href="@($"/families/{FamilyId}/entries/new")">New entry</a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <section class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h2 class="h6 mb-0">Members (@Members.Count)</h2>
+                    @if (IsAdmin)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="ToggleAddMember">
+                            @(ShowAddMember ? "Cancel" : "Add member")
+                        </button>
+                    }
+                </div>
+                <div class="card-body">
+                    @if (ShowAddMember && IsAdmin)
+                    {
+                        <EditForm Model="NewMember" OnValidSubmit="AddMember" FormName="add-member">
+                            <DataAnnotationsValidator />
+                            <div class="mb-2">
+                                <InputText class="form-control form-control-sm" @bind-Value="NewMember.Email" placeholder="Email address" />
+                                <ValidationMessage For="() => NewMember.Email" class="text-danger small" />
+                            </div>
+                            <div class="mb-2">
+                                <InputText class="form-control form-control-sm" @bind-Value="NewMember.RelationshipDescription" placeholder="Relationship (e.g. Grandmother)" />
+                                <ValidationMessage For="() => NewMember.RelationshipDescription" class="text-danger small" />
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm" disabled="@Busy">Add</button>
+                        </EditForm>
+                        <hr />
+                    }
+                    <MemberList Members="Members" IsAdmin="IsAdmin" CurrentUserId="CurrentUserId" OnRemove="RemoveMember" />
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-8">
+            <section>
+                <h2 class="h5 mb-3">Journal entries</h2>
+                @if (Entries.Count == 0)
+                {
+                    <p class="text-muted">No entries yet. Be the first to write one.</p>
+                }
+                else
+                {
+                    @foreach (var entry in Entries)
+                    {
+                        <JournalEntryCard Entry="entry" OnDelete="DeleteEntry" />
+                    }
+                }
+            </section>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid FamilyId { get; set; }
+
+    private FamilyResponse? Family { get; set; }
+    private List<FamilyMemberResponse> Members { get; set; } = new();
+    private List<JournalEntryResponse> Entries { get; set; } = new();
+    private AddMemberRequest NewMember { get; set; } = new();
+    private bool Loading { get; set; } = true;
+    private bool NotFound { get; set; }
+    private bool ShowAddMember { get; set; }
+    private bool Busy { get; set; }
+    private bool IsAdmin { get; set; }
+    private Guid CurrentUserId { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        ErrorMessage = null;
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var userIdValue = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            CurrentUserId = userIdValue is not null && Guid.TryParse(userIdValue, out var id) ? id : Guid.Empty;
+
+            Family = await Api.GetFamilyAsync(FamilyId);
+            Members = await Api.GetMembersAsync(FamilyId);
+            var list = await Api.GetEntriesAsync(FamilyId, 1, 20);
+            Entries = list.Items;
+            IsAdmin = Members.Any(m => m.UserId == CurrentUserId && m.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase));
+        }
+        catch (ApiException ex)
+        {
+            if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden)
+            {
+                NotFound = true;
+            }
+            else
+            {
+                ErrorMessage = ex.Message;
+            }
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private void ToggleAddMember() => ShowAddMember = !ShowAddMember;
+
+    private async Task AddMember()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            await Api.AddMemberAsync(FamilyId, NewMember);
+            NewMember = new AddMemberRequest();
+            ShowAddMember = false;
+            await LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RemoveMember(FamilyMemberResponse member)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Remove {member.FullName} from this family?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.RemoveMemberAsync(FamilyId, member.UserId);
+            await LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task DeleteEntry(JournalEntryResponse entry)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Delete \"{entry.Title}\"?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.DeleteEntryAsync(entry.Id);
+            await LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+}

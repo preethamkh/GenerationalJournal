@@ -1,0 +1,158 @@
+@page "/families/{FamilyId:guid}/entries/new"
+@page "/entries/{EntryId:guid}/edit"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsEdit ? "Edit entry" : "New entry")</PageTitle>
+
+@if (Loading)
+{
+    <div class="text-center text-muted py-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1>@(IsEdit ? "Edit journal entry" : "New journal entry")</h1>
+        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Cancel">Cancel</button>
+    </div>
+
+    <EditForm Model="Model" OnValidSubmit="Save" FormName="journal-entry">
+        <DataAnnotationsValidator />
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="title" class="form-label">Title</label>
+                    <InputText id="title" class="form-control" @bind-Value="Model.Title" placeholder="A memorable moment" />
+                    <ValidationMessage For="() => Model.Title" class="text-danger small" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="content" class="form-label">Story</label>
+                    <InputTextArea id="content" class="form-control" rows="6" @bind-Value="Model.Content" placeholder="Write your entry..." />
+                    <ValidationMessage For="() => Model.Content" class="text-danger small" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">How are you feeling?</label>
+                    <MoodSelector @bind-Mood="Model.Mood" />
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="entryDate" class="form-label">Date</label>
+                        <InputDate id="entryDate" class="form-control" @bind-Value="Model.EntryDate" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="tags" class="form-label">Tags</label>
+                        <InputText id="tags" class="form-control" @bind-Value="Model.Tags" placeholder="birthday, vacation, family" />
+                        <ValidationMessage For="() => Model.Tags" class="text-danger small" />
+                    </div>
+                </div>
+
+                <div class="form-check form-switch mb-3">
+                    <InputCheckbox class="form-check-input" id="isPrivate" @bind-Value="Model.IsPrivate" />
+                    <label class="form-check-label" for="isPrivate">Keep this entry private</label>
+                </div>
+
+                <button type="submit" class="btn btn-primary" disabled="@Busy">
+                    @(Busy ? "Saving..." : (IsEdit ? "Save changes" : "Create entry"))
+                </button>
+            </div>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public Guid? FamilyId { get; set; }
+
+    [Parameter]
+    public Guid? EntryId { get; set; }
+
+    private CreateJournalEntryRequest Model { get; set; } = new();
+    private bool IsEdit { get; set; }
+    private bool Loading { get; set; } = true;
+    private bool Busy { get; set; }
+    private string? ErrorMessage { get; set; }
+    private Guid TargetFamilyId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        IsEdit = EntryId.HasValue;
+        if (IsEdit)
+        {
+            try
+            {
+                var entry = await Api.GetEntryAsync(EntryId!.Value);
+                TargetFamilyId = entry.FamilyId;
+                Model = new CreateJournalEntryRequest
+                {
+                    Title = entry.Title,
+                    Content = entry.Content,
+                    Mood = entry.Mood,
+                    EntryDate = entry.EntryDate,
+                    IsPrivate = entry.IsPrivate,
+                    Tags = entry.Tags
+                };
+            }
+            catch (ApiException ex)
+            {
+                ErrorMessage = ex.Message;
+            }
+        }
+        else
+        {
+            TargetFamilyId = FamilyId ?? Guid.Empty;
+            Model.EntryDate = DateTime.Today;
+        }
+
+        Loading = false;
+    }
+
+    private async Task Save()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            if (IsEdit)
+            {
+                var update = new UpdateJournalEntryRequest
+                {
+                    Title = Model.Title,
+                    Content = Model.Content,
+                    Mood = Model.Mood,
+                    EntryDate = Model.EntryDate,
+                    IsPrivate = Model.IsPrivate,
+                    Tags = Model.Tags
+                };
+                await Api.UpdateEntryAsync(EntryId!.Value, update);
+            }
+            else
+            {
+                await Api.CreateEntryAsync(TargetFamilyId, Model);
+            }
+
+            Navigation.NavigateTo($"/families/{TargetFamilyId}");
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void Cancel() => Navigation.NavigateTo($"/families/{TargetFamilyId}");
+}
