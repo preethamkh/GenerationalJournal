@@ -1,0 +1,171 @@
+@page "/"
+@page "/dashboard"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject AuthStateProvider AuthState
+
+<PageTitle>Dashboard</PageTitle>
+
+<h1>Dashboard</h1>
+<p class="text-muted">Welcome back, @FirstName. Here's what's happening in your families.</p>
+
+@if (Loading)
+{
+    <div class="text-center text-muted py-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+}
+else
+{
+    <section class="mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 mb-0">My families</h2>
+            <button type="button" class="btn btn-primary btn-sm" @onclick="ToggleCreateForm">
+                @(ShowCreateForm ? "Cancel" : "New family")
+            </button>
+        </div>
+
+        @if (ShowCreateForm)
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <EditForm Model="NewFamily" OnValidSubmit="CreateFamily" FormName="create-family">
+                        <DataAnnotationsValidator />
+                        <div class="mb-3">
+                            <label for="familyName" class="form-label">Family name</label>
+                            <InputText id="familyName" class="form-control" @bind-Value="NewFamily.Name" placeholder="e.g. Smith Family" />
+                            <ValidationMessage For="() => NewFamily.Name" class="text-danger small" />
+                        </div>
+                        <div class="mb-3">
+                            <label for="familyDescription" class="form-label">Description</label>
+                            <InputTextArea id="familyDescription" class="form-control" @bind-Value="NewFamily.Description" rows="2" placeholder="Tell us about this family" />
+                            <ValidationMessage For="() => NewFamily.Description" class="text-danger small" />
+                        </div>
+                        <button type="submit" class="btn btn-primary" disabled="@Busy">Create family</button>
+                    </EditForm>
+                </div>
+            </div>
+        }
+
+        @if (Families.Count == 0)
+        {
+            <p class="text-muted">You don't have any families yet. Create your first family to get started.</p>
+        }
+        else
+        {
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
+                @foreach (var family in Families)
+                {
+                    <FamilyCard Family="family" />
+                }
+            </div>
+        }
+    </section>
+
+    <section>
+        <h2 class="h4 mb-3">Recent entries</h2>
+        @if (RecentEntries.Count == 0)
+        {
+            <p class="text-muted">No journal entries yet. Open a family to write your first entry.</p>
+        }
+        else
+        {
+            <div class="list-group">
+                @foreach (var entry in RecentEntries)
+                {
+                    <a class="list-group-item list-group-item-action" href="@($"/families/{entry.FamilyId}")">
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                            <div>
+                                <span class="fw-semibold">@entry.Title</span>
+                                <span class="text-muted small">&middot; @entry.AuthorName</span>
+                            </div>
+                            <span class="text-muted small text-nowrap">@entry.EntryDate.ToString("MMM d, yyyy")</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(entry.Mood))
+                        {
+                            <span class="badge rounded-pill text-bg-primary mt-1">@entry.Mood</span>
+                        }
+                    </a>
+                }
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private List<FamilyResponse> Families { get; set; } = new();
+    private List<JournalEntryResponse> RecentEntries { get; set; } = new();
+    private CreateFamilyRequest NewFamily { get; set; } = new();
+    private bool Loading { get; set; } = true;
+    private bool ShowCreateForm { get; set; }
+    private bool Busy { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string FirstName { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        ErrorMessage = null;
+        try
+        {
+            var authState = await AuthState.GetAuthenticationStateAsync();
+            FirstName = authState.User.Identity?.Name ?? string.Empty;
+
+            Families = await Api.GetFamiliesAsync();
+
+            var recent = new List<JournalEntryResponse>();
+            if (Families.Count > 0)
+            {
+                var tasks = Families.Select(f => Api.GetEntriesAsync(f.Id, 1, 5)).ToArray();
+                var results = await Task.WhenAll(tasks);
+                recent = results.SelectMany(r => r.Items)
+                    .OrderByDescending(e => e.EntryDate)
+                    .Take(5)
+                    .ToList();
+            }
+
+            RecentEntries = recent;
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private void ToggleCreateForm() => ShowCreateForm = !ShowCreateForm;
+
+    private async Task CreateFamily()
+    {
+        Busy = true;
+        try
+        {
+            await Api.CreateFamilyAsync(NewFamily);
+            NewFamily = new CreateFamilyRequest();
+            ShowCreateForm = false;
+            await LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+}

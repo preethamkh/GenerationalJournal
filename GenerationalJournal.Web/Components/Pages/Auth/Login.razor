@@ -1,0 +1,73 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@inject ApiClient Api
+@inject AuthStateProvider AuthState
+@inject NavigationManager Navigation
+
+<PageTitle>Log in</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-5 col-xl-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h3 mb-2 text-center">Sign in</h1>
+                <p class="text-muted text-center mb-4">Welcome back to your family journal.</p>
+
+                @if (!string.IsNullOrEmpty(ErrorMessage))
+                {
+                    <div class="alert alert-danger py-2" role="alert">@ErrorMessage</div>
+                }
+
+                <EditForm Model="Model" OnValidSubmit="HandleLogin" FormName="login">
+                    <DataAnnotationsValidator />
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <InputText id="email" class="form-control" @bind-Value="Model.Email" placeholder="you@example.com" autocomplete="email" />
+                        <ValidationMessage For="() => Model.Email" class="text-danger small" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <InputText id="password" type="password" class="form-control" @bind-Value="Model.Password" placeholder="Your password" autocomplete="current-password" />
+                        <ValidationMessage For="() => Model.Password" class="text-danger small" />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100" disabled="@Busy">
+                        @(Busy ? "Signing in..." : "Sign in")
+                    </button>
+                </EditForm>
+
+                <p class="text-center mt-3 mb-0">
+                    Don't have an account? <a href="register">Register</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    private string? ReturnUrl { get; set; }
+
+    private LoginRequest Model { get; set; } = new();
+    private string? ErrorMessage { get; set; }
+    private bool Busy { get; set; }
+
+    private async Task HandleLogin()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            var response = await Api.LoginAsync(Model);
+            await AuthState.LoginAsync(response);
+            Navigation.NavigateTo(string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl, forceLoad: true);
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+}
