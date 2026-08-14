@@ -17,7 +17,7 @@ public class FamilyServiceTests
         _sut = new FamilyService(_familyRepositoryMock.Object, _userRepositoryMock.Object);
     }
 
-    private static Family CreateFamily(Guid createdByUserId, string name = "Smith Family")
+    private static Family CreateFamily(Guid createdByUserId, string name = "Preetham Family")
     {
         return new Family
         {
