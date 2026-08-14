@@ -1,0 +1,102 @@
+@page "/families/{FamilyId:guid}/timeline"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>@(FamilyName ?? "Timeline")</PageTitle>
+
+@if (Loading)
+{
+    <div class="text-center text-muted py-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+}
+else
+{
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="@($"/families/{FamilyId}")">@(FamilyName ?? "Family")</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Timeline</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <h1>@(FamilyName ?? "Family") timeline</h1>
+        <a class="btn btn-primary" href="@($"/families/{FamilyId}/entries/new")">New entry</a>
+    </div>
+
+    @if (Entries.Count == 0)
+    {
+        <p class="text-muted">No entries yet. Capture your first memory.</p>
+    }
+    else
+    {
+        <div class="timeline">
+            @foreach (var entry in Entries.OrderByDescending(e => e.EntryDate))
+            {
+                <div class="timeline-item">
+                    <div class="timeline-date">@entry.EntryDate.ToString("MMM d, yyyy")</div>
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-body">
+                        <JournalEntryCard Entry="entry" OnDelete="DeleteEntry" />
+                    </div>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid FamilyId { get; set; }
+
+    private List<JournalEntryResponse> Entries { get; set; } = new();
+    private string? FamilyName { get; set; }
+    private bool Loading { get; set; } = true;
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var family = await Api.GetFamilyAsync(FamilyId);
+            FamilyName = family.Name;
+            var list = await Api.GetEntriesAsync(FamilyId, 1, 100);
+            Entries = list.Items;
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task DeleteEntry(JournalEntryResponse entry)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Delete \"{entry.Title}\"?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.DeleteEntryAsync(entry.Id);
+            Entries.RemoveAll(e => e.Id == entry.Id);
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+}
