@@ -83,6 +83,8 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IFamilyRepository, FamilyRepository>();
 builder.Services.AddScoped<IFamilyService, FamilyService>();
+builder.Services.AddScoped<IJournalEntryRepository, JournalEntryRepository>();
+builder.Services.AddScoped<IJournalService, JournalService>();
 
 var app = builder.Build();
 
@@ -110,6 +112,7 @@ app.MapGet("/", () => Results.Ok(new { name = "Generational Journal API", versio
 
 app.MapAuthEndpoints();
 app.MapFamilyEndpoints();
+app.MapJournalEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {
