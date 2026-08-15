@@ -1,8 +1,10 @@
 @page "/families/{FamilyId:guid}/entries/new"
 @page "/entries/{EntryId:guid}/edit"
 @attribute [Authorize]
+@using System.IO
 @inject ApiClient Api
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>@(IsEdit ? "Edit entry" : "New entry")</PageTitle>
 
@@ -69,6 +71,70 @@ else
             </div>
         </div>
     </EditForm>
+
+    @if (IsEdit)
+    {
+        <section class="card shadow-sm mt-3">
+            <div class="card-header bg-white">
+                <h2 class="h6 mb-0">Media (@Media.Count)</h2>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="mediaFile" class="form-label">Add media</label>
+                    <InputFile id="mediaFile" OnChange="OnFilesSelected" multiple class="form-control" />
+                    <div class="form-text">Supported: JPG, PNG, GIF, MP4, MOV. Max 100 MB each.</div>
+                </div>
+
+                @if (Uploading)
+                {
+                    <div class="text-muted small mb-2">Uploading...</div>
+                }
+
+                @if (Media.Count == 0)
+                {
+                    <p class="text-muted mb-0">No media yet.</p>
+                }
+                else
+                {
+                    <div class="row g-3">
+                        @foreach (var item in Media)
+                        {
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="card h-100">
+                                    @if (item.MediaType == "image")
+                                    {
+                                        @if (!string.IsNullOrEmpty(item.Preview))
+                                        {
+                                            <img src="@item.Preview" class="card-img-top" alt="@item.FileName" />
+                                        }
+                                        else
+                                        {
+                                            <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 120px;">
+                                                <span class="text-muted small">Loading...</span>
+                                            </div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 120px;">
+                                            <span class="text-muted">Video</span>
+                                        </div>
+                                    }
+                                    <div class="card-body p-2">
+                                        <div class="small text-truncate" title="@item.FileName">@item.FileName</div>
+                                        <div class="d-flex justify-content-between align-items-center mt-1">
+                                            <span class="text-muted small">@item.DisplaySize</span>
+                                            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => DeleteMedia(item)">Delete</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+    }
 }
 
 @code {
@@ -84,6 +150,10 @@ else
     private bool Busy { get; set; }
     private string? ErrorMessage { get; set; }
     private Guid TargetFamilyId { get; set; }
+
+    private List<MediaResponse> Media { get; set; } = new();
+    private bool Uploading { get; set; }
+    private const long MaxFileSize = 100L * 1024 * 1024;
 
     protected override async Task OnInitializedAsync()
     {
@@ -103,6 +173,8 @@ else
                     IsPrivate = entry.IsPrivate,
                     Tags = entry.Tags
                 };
+
+                await LoadMediaAsync();
             }
             catch (ApiException ex)
             {
@@ -155,4 +227,72 @@ else
     }
 
     private void Cancel() => Navigation.NavigateTo($"/families/{TargetFamilyId}");
+
+    private async Task LoadMediaAsync()
+    {
+        Media = await Api.GetMediaAsync(EntryId!.Value);
+
+        foreach (var item in Media.Where(m => m.MediaType == "image"))
+        {
+            try
+            {
+                var bytes = await Api.GetMediaFileAsync(item.Id);
+                item.Preview = $"data:{item.ContentType};base64,{Convert.ToBase64String(bytes)}";
+            }
+            catch (ApiException)
+            {
+                item.Preview = string.Empty;
+            }
+        }
+    }
+
+    private async Task OnFilesSelected(InputFileChangeEventArgs e)
+    {
+        if (e.FileCount == 0)
+        {
+            return;
+        }
+
+        Uploading = true;
+        ErrorMessage = null;
+        try
+        {
+            foreach (var file in e.GetMultipleFiles())
+            {
+                using var stream = new MemoryStream();
+                await file.OpenReadStream(MaxFileSize).CopyToAsync(stream);
+                stream.Position = 0;
+                await Api.UploadMediaAsync(EntryId!.Value, file.Name, stream, file.ContentType);
+            }
+
+            await LoadMediaAsync();
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Uploading = false;
+        }
+    }
+
+    private async Task DeleteMedia(MediaResponse item)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Delete \"{item.FileName}\"?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.DeleteMediaAsync(item.Id);
+            await LoadMediaAsync();
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
 }
