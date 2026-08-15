@@ -162,7 +162,7 @@ using (var scope = app.Services.CreateScope())
         Directory.CreateDirectory(mediaSettings.StorageRootPath);
     }
 
-    db.Database.EnsureCreated();
+    db.Database.Migrate();
 }
 
 app.Run();
