@@ -9,6 +9,7 @@ A multi-generational family journal application built with .NET 9 and Clean Arch
 - **Infrastructure** - EF Core, database (SQLite), repository implementations
 - **API** - Minimal API endpoints, authentication, middleware
 - **Web** - Blazor Web App frontend (Interactive Server, Bootstrap)
+- **Functions** - Azure Functions (thumbnail generation, database backup, health monitoring)
 
 ## Tech Stack
 
@@ -20,6 +21,7 @@ A multi-generational family journal application built with .NET 9 and Clean Arch
 - Serilog Structured Logging
 - OpenAPI / Swagger
 - Bootstrap 5
+- Azure Functions (.NET 9 isolated worker) + Azurite emulator
 
 ## Quick Start
 
@@ -66,6 +68,12 @@ The web app starts at `http://localhost:5037` (or the port shown in the console)
 API base URL is configurable via the `ApiBaseUrl` setting in
 `GenerationalJournal.Web/appsettings.json` (defaults to `http://localhost:5278`).
 
+### Azure Functions
+
+Background jobs (image thumbnails, database backups, health monitoring) run as
+Azure Functions. See [docs/AZURE_FUNCTIONS.md](docs/AZURE_FUNCTIONS.md) for
+local setup with Azurite and deployment instructions.
+
 ## Project Structure
 
 ```
@@ -75,6 +83,9 @@ GenerationalJournal/
 ├── GenerationalJournal.Infrastructure/ # EF Core, repositories
 ├── GenerationalJournal.Api/          # Minimal API, configuration
 ├── GenerationalJournal.Web/          # Blazor Web App frontend
+├── GenerationalJournal.Functions/    # Azure Functions (thumbnails, backup, health)
 ├── data/                             # SQLite database (created at runtime)
+├── deploy/                           # Azure Bicep deployment templates
+├── scripts/                          # Local development helper scripts
 └── docs/                             # Documentation
 ```
