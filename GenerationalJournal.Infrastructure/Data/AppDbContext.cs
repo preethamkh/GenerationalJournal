@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<Family> Families => Set<Family>();
     public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
+    public DbSet<MediaItem> MediaItems => Set<MediaItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,6 +71,22 @@ public class AppDbContext : DbContext
             entity.HasOne(e => e.Family)
                 .WithMany()
                 .HasForeignKey(e => e.FamilyId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MediaItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.EntryId);
+            entity.HasIndex(e => e.FamilyId);
+            entity.Property(e => e.FileName).HasMaxLength(512).IsRequired();
+            entity.Property(e => e.StoredFileName).HasMaxLength(512).IsRequired();
+            entity.Property(e => e.ContentType).HasMaxLength(128);
+            entity.Property(e => e.MediaType).HasMaxLength(16);
+            entity.Property(e => e.StoragePath).HasMaxLength(1024);
+            entity.HasOne(e => e.Entry)
+                .WithMany()
+                .HasForeignKey(e => e.EntryId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
