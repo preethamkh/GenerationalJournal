@@ -113,6 +113,47 @@ public class ApiClient
         await EnsureSuccessAsync(response);
     }
 
+    // Media
+
+    public async Task<List<MediaResponse>> GetMediaAsync(Guid entryId)
+    {
+        using var message = await CreateRequestAsync(HttpMethod.Get, $"api/entries/{entryId}/media");
+        using var response = await _http.SendAsync(message);
+        return await HandleAsync<List<MediaResponse>>(response);
+    }
+
+    public async Task<MediaResponse> UploadMediaAsync(Guid entryId, string fileName, Stream content, string contentType)
+    {
+        using var message = await CreateRequestAsync(HttpMethod.Post, $"api/entries/{entryId}/media");
+        using var form = new MultipartFormDataContent();
+        var fileContent = new StreamContent(content);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(
+            string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType);
+        form.Add(fileContent, "file", fileName);
+        message.Content = form;
+        using var response = await _http.SendAsync(message);
+        return await HandleAsync<MediaResponse>(response);
+    }
+
+    public async Task DeleteMediaAsync(Guid mediaId)
+    {
+        using var message = await CreateRequestAsync(HttpMethod.Delete, $"api/media/{mediaId}");
+        using var response = await _http.SendAsync(message);
+        await EnsureSuccessAsync(response);
+    }
+
+    public async Task<byte[]> GetMediaFileAsync(Guid mediaId)
+    {
+        using var message = await CreateRequestAsync(HttpMethod.Get, $"api/media/{mediaId}/file");
+        using var response = await _http.SendAsync(message);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw await ApiException.CreateAsync(response);
+        }
+
+        return await response.Content.ReadAsByteArrayAsync();
+    }
+
     private async Task<HttpRequestMessage> CreateRequestAsync(HttpMethod method, string url, object? body = null)
     {
         var message = new HttpRequestMessage(method, url);
