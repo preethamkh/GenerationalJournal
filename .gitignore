@@ -12,6 +12,9 @@ obj/
 *.db-shm
 *.db-wal
 
+# Azurite storage emulator data
+/.azurite/
+
 # Environment
 .env
 *.env.local
