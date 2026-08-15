@@ -6,4 +6,5 @@
   <Project Path="GenerationalJournal.Infrastructure/GenerationalJournal.Infrastructure.csproj" />
   <Project Path="GenerationalJournal.IntegrationTests/GenerationalJournal.IntegrationTests.csproj" />
   <Project Path="GenerationalJournal.UnitTests/GenerationalJournal.UnitTests.csproj" />
+  <Project Path="GenerationalJournal.Functions/GenerationalJournal.Functions.csproj" />
 </Solution>

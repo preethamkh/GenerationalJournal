@@ -1,0 +1,12 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "DatabaseBackup:Container": "database-backups",
+    "HealthCheck:ApiUrl": "http://localhost:5278/health"
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=../data/familyjournal.db"
+  }
+}
