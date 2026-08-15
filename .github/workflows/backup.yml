@@ -1,0 +1,55 @@
+name: Backup
+
+# Scheduled backup of the SQLite database and media files to a NAS or
+# external location.
+#
+# The application data lives in the (gitignored) data/ directory on the host
+# that runs the app, so this workflow reaches that host over SSH and copies the
+# files from there to the backup target.
+#
+# Required repository secrets:
+#   BACKUP_HOST        - Hostname/IP of the machine running the app (or a
+#                        jump host that can reach the backup target)
+#   BACKUP_USER        - SSH username
+#   BACKUP_SSH_KEY     - Private key for SSH authentication
+#   (SSH connects on port 22; add a `port` input below if yours differs)
+#
+# Adjust APP_DATA_PATH (where data/ lives on the host) and BACKUP_TARGET
+# (the mounted NAS share or external drive path on the host) below.
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # daily at 03:00 UTC
+  workflow_dispatch:
+
+jobs:
+  backup:
+    name: Backup database and media
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Backup over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.BACKUP_HOST }}
+          username: ${{ secrets.BACKUP_USER }}
+          key: ${{ secrets.BACKUP_SSH_KEY }}
+          script: |
+            set -euo pipefail
+
+            APP_DATA_PATH=/opt/generationaljournal/data
+            BACKUP_TARGET=/mnt/nas/generationaljournal
+
+            mkdir -p "$BACKUP_TARGET/database" "$BACKUP_TARGET/media"
+
+            # Database (include -wal/-shm sidecars for a consistent restore)
+            cp "$APP_DATA_PATH/familyjournal.db"* "$BACKUP_TARGET/database/" 2>/dev/null || \
+              cp "$APP_DATA_PATH/familyjournal.db" "$BACKUP_TARGET/database/"
+
+            # Media
+            rsync -av --delete "$APP_DATA_PATH/media/" "$BACKUP_TARGET/media/"
+
+            echo "Backup completed to $BACKUP_TARGET"
