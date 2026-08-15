@@ -3,9 +3,11 @@ using GenerationalJournal.Api.Endpoints;
 using GenerationalJournal.Api.Middleware;
 using GenerationalJournal.Application.Configuration;
 using GenerationalJournal.Application.Services;
+using GenerationalJournal.Application.Storage;
 using GenerationalJournal.Domain.Repositories;
 using GenerationalJournal.Infrastructure.Data;
 using GenerationalJournal.Infrastructure.Repositories;
+using GenerationalJournal.Infrastructure.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -88,6 +90,23 @@ builder.Services.PostConfigure<MediaSettings>(settings =>
         settings.StorageRootPath = Path.GetFullPath(
             Path.Combine(builder.Environment.ContentRootPath, "..", "data", "media"));
     }
+    else if (!Path.IsPathRooted(settings.StorageRootPath))
+    {
+        settings.StorageRootPath = Path.GetFullPath(
+            Path.Combine(builder.Environment.ContentRootPath, settings.StorageRootPath));
+    }
+});
+
+var mediaStorageProvider = builder.Configuration["Media:StorageProvider"] ?? "LocalFileSystem";
+builder.Services.AddScoped<IMediaStorage>(sp =>
+{
+    if (mediaStorageProvider.Equals("CloudBlob", StringComparison.OrdinalIgnoreCase))
+    {
+        return new CloudBlobMediaStorage();
+    }
+
+    return new LocalFileSystemMediaStorage(
+        sp.GetRequiredService<IOptions<MediaSettings>>());
 });
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();

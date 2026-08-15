@@ -94,8 +94,8 @@ public static class MediaEndpoints
             try
             {
                 var userId = GetUserId(user);
-                var (path, contentType, fileName) = await mediaService.GetMediaFileAsync(id, userId);
-                return Results.File(path, contentType, fileName);
+                var (content, contentType, fileName) = await mediaService.GetMediaFileAsync(id, userId);
+                return Results.File(content, contentType, fileName);
             }
             catch (KeyNotFoundException ex)
             {

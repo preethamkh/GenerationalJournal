@@ -2,6 +2,7 @@ namespace GenerationalJournal.Application.Services;
 
 using GenerationalJournal.Application.Configuration;
 using GenerationalJournal.Application.DTOs.Media;
+using GenerationalJournal.Application.Storage;
 using GenerationalJournal.Domain.Entities;
 using GenerationalJournal.Domain.Repositories;
 using Microsoft.Extensions.Options;
@@ -13,17 +14,20 @@ public class MediaService : IMediaService
     private readonly IMediaRepository _mediaRepository;
     private readonly IJournalEntryRepository _journalEntryRepository;
     private readonly IFamilyRepository _familyRepository;
+    private readonly IMediaStorage _mediaStorage;
     private readonly MediaSettings _settings;
 
     public MediaService(
         IMediaRepository mediaRepository,
         IJournalEntryRepository journalEntryRepository,
         IFamilyRepository familyRepository,
+        IMediaStorage mediaStorage,
         IOptions<MediaSettings> settings)
     {
         _mediaRepository = mediaRepository;
         _journalEntryRepository = journalEntryRepository;
         _familyRepository = familyRepository;
+        _mediaStorage = mediaStorage;
         _settings = settings.Value;
     }
 
@@ -55,15 +59,9 @@ public class MediaService : IMediaService
 
         var mediaType = ImageExtensions.Contains(extension) ? "image" : "video";
         var storedFileName = $"{Guid.NewGuid():N}{extension}";
-        var directory = System.IO.Path.Combine(_settings.StorageRootPath, entry.FamilyId.ToString(), entry.Id.ToString());
-        Directory.CreateDirectory(directory);
+        var relativePath = $"{entry.FamilyId}/{entry.Id}/{storedFileName}";
 
-        var fullPath = System.IO.Path.Combine(directory, storedFileName);
-
-        await using (var fileStream = new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write))
-        {
-            await content.CopyToAsync(fileStream);
-        }
+        var storagePath = await _mediaStorage.SaveAsync(relativePath, content);
 
         var mediaItem = new MediaItem
         {
@@ -76,7 +74,7 @@ public class MediaService : IMediaService
             ContentType = contentType,
             FileSizeBytes = length,
             MediaType = mediaType,
-            StoragePath = fullPath,
+            StoragePath = storagePath,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -105,25 +103,19 @@ public class MediaService : IMediaService
 
         await _mediaRepository.DeleteAsync(mediaItem);
 
-        if (File.Exists(mediaItem.StoragePath))
-        {
-            File.Delete(mediaItem.StoragePath);
-        }
+        await _mediaStorage.DeleteAsync(mediaItem.StoragePath);
     }
 
-    public async Task<(string Path, string ContentType, string FileName)> GetMediaFileAsync(Guid mediaId, Guid userId)
+    public async Task<(Stream Content, string ContentType, string FileName)> GetMediaFileAsync(Guid mediaId, Guid userId)
     {
         var mediaItem = await _mediaRepository.GetByIdAsync(mediaId)
             ?? throw new KeyNotFoundException("Media not found.");
 
         await EnsureMemberAsync(mediaItem.FamilyId, userId);
 
-        if (!File.Exists(mediaItem.StoragePath))
-        {
-            throw new KeyNotFoundException("Media file not found.");
-        }
+        var content = await _mediaStorage.GetAsync(mediaItem.StoragePath);
 
-        return (mediaItem.StoragePath, mediaItem.ContentType, mediaItem.FileName);
+        return (content, mediaItem.ContentType, mediaItem.FileName);
     }
 
     private async Task EnsureMemberAsync(Guid familyId, Guid userId)
