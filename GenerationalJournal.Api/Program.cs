@@ -8,6 +8,7 @@ using GenerationalJournal.Infrastructure.Data;
 using GenerationalJournal.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
@@ -79,12 +80,24 @@ builder.Services.AddHealthChecks();
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 
+builder.Services.Configure<MediaSettings>(builder.Configuration.GetSection("Media"));
+builder.Services.PostConfigure<MediaSettings>(settings =>
+{
+    if (string.IsNullOrWhiteSpace(settings.StorageRootPath))
+    {
+        settings.StorageRootPath = Path.GetFullPath(
+            Path.Combine(builder.Environment.ContentRootPath, "..", "data", "media"));
+    }
+});
+
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IFamilyRepository, FamilyRepository>();
 builder.Services.AddScoped<IFamilyService, FamilyService>();
 builder.Services.AddScoped<IJournalEntryRepository, JournalEntryRepository>();
 builder.Services.AddScoped<IJournalService, JournalService>();
+builder.Services.AddScoped<IMediaRepository, MediaRepository>();
+builder.Services.AddScoped<IMediaService, MediaService>();
 
 var app = builder.Build();
 
@@ -113,6 +126,7 @@ app.MapGet("/", () => Results.Ok(new { name = "Generational Journal API", versio
 app.MapAuthEndpoints();
 app.MapFamilyEndpoints();
 app.MapJournalEndpoints();
+app.MapMediaEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {
@@ -122,6 +136,13 @@ using (var scope = app.Services.CreateScope())
     {
         Directory.CreateDirectory(dataDir);
     }
+
+    var mediaSettings = scope.ServiceProvider.GetRequiredService<IOptions<MediaSettings>>().Value;
+    if (!Directory.Exists(mediaSettings.StorageRootPath))
+    {
+        Directory.CreateDirectory(mediaSettings.StorageRootPath);
+    }
+
     db.Database.EnsureCreated();
 }
 
